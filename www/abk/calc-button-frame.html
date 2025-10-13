@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { margin: 0; padding: 10px; background: #fff; font-family: Arial; }
+        .button-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        button { padding: 20px; font-size: 18px; font-weight: bold; border: 1px solid #ddd;
+                    border-radius: 5px; background: #f9f9f9; cursor: pointer; transition: all 0.2s; }
+        button:hover { background: #e0e0e0; }
+        button:active { transform: scale(0.95); }
+        .operator { background: #e3f2fd; }
+        .operator:hover { background: #bbdefb; }
+        .clear { background: #ffebee; }
+        .clear:hover { background: #ffcdd2; }
+        .equals { background: #e8f5e9; grid-column: span 3; }
+        .equals:hover { background: #c8e6c9; }
+    </style>
+</head>
+<body>
+    <div class="button-grid">
+        <button onclick="sendButton('7')">7</button>
+        <button onclick="sendButton('8')">8</button>
+        <button onclick="sendButton('9')">9</button>
+        <button onclick="sendButton('4')">4</button>
+        <button onclick="sendButton('5')">5</button>
+        <button onclick="sendButton('6')">6</button>
+        <button onclick="sendButton('1')">1</button>
+        <button onclick="sendButton('2')">2</button>
+        <button onclick="sendButton('3')">3</button>
+        <button onclick="sendButton('0')" style="grid-column: span 2;">0</button>
+        <button onclick="sendButton('C')" class="clear">C</button>
+        <button onclick="sendButton('+')" class="operator">+</button>
+        <button onclick="sendButton('-')" class="operator">-</button>
+        <button onclick="sendButton('=')" class="equals">=</button>
+    </div>
+    <script>
+        function sendButton(value) {
+            window.parent.postMessage({
+                type: 'button',
+                value: value
+            }, '*');
+        }
+    </script>
+</body>
+</html>

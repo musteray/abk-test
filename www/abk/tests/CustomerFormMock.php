@@ -13,18 +13,32 @@ class DatabaseMock
         }
         return $this->connection;
     }
+
+    /**
+     * Clean up after each test
+     * Removes test data
+     */
+    protected function tearDown(): void
+    {
+        $pdo = $this->getConnection();
+
+        if ($pdo !== null) {
+            // Clean up test data
+            $pdo->exec('TRUNCATE TABLE customers');
+        }
+    }
     
     private function createTestTable(): void
     {
+        // Create table with UNIQUE constraint on email
         $sql = 'CREATE TABLE IF NOT EXISTS customers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             lastname VARCHAR(255) NOT NULL,
             firstname VARCHAR(255) NOT NULL,
-            email VARCHAR(255) NOT NULL,
+            email VARCHAR(255) NOT NULL UNIQUE,
             city VARCHAR(255) NOT NULL,
             country VARCHAR(255) NOT NULL,
-            image_path VARCHAR(500),
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            image_path VARCHAR(500) DEFAULT NULL
         )';
         
         $this->connection->exec($sql);
@@ -43,14 +57,30 @@ class DatabaseMock
         return (int) $pdo->lastInsertId();
     }
     
-    public function getCustomerById(int $id): ?array
+    public function getCustomerByEmail(string $email): ?array
     {
         $pdo = $this->getConnection();
-        $stmt = $pdo->prepare('SELECT * FROM customers WHERE id = :id');
-        $stmt->execute([':id' => $id]);
+        $stmt = $pdo->prepare('SELECT * FROM customers WHERE email = :email');
+        $stmt->execute([':email' => $email]);
         
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         return $result ?: null;
+    }
+    
+    public function updateCustomer(array $data): bool
+    {
+        $pdo = $this->getConnection();
+        
+        $sql = 'UPDATE customers SET 
+                    lastname = :lastname, 
+                    firstname = :firstname, 
+                    city = :city, 
+                    country = :country, 
+                    image_path = :image_path 
+                WHERE email = :email';
+        
+        $stmt = $pdo->prepare($sql);
+        return $stmt->execute($data);
     }
 }
 

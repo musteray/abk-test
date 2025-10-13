@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { margin: 0; padding: 15px; background: #fff; font-family: Arial; }
+        #display { font-size: 20px; font-weight: bold; color: #333; min-height: 24px; }
+    </style>
+</head>
+<body>
+    <div id="display"></div>
+    <script>
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'update') {
+                document.getElementById('display').textContent = event.data.value || '0';
+            }
+        });
+    </script>
+</body>
+</html>

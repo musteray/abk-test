@@ -6,3 +6,4 @@
 /buildtest
 /www/abk/vendor
 /www/abk/composer.lock
+www/abk/uploads/*

@@ -80,9 +80,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save'])) {
         
         // Validate form data
         if ($validator->validateCustomerData($formData)) {
-            // Insert into database
-            $customerId = $database->insertCustomer($formData);
-            
+            $queryString = "";
+
+            if (isset($_GET['email'])) {
+                // Insert into database
+                $customerId = $database->insertCustomer($formData);
+
+                $queryString = '?success=1&id=' . $customerId;
+            } else {
+               $database->updateCustomer($formData);
+               $queryString = '?email=' . urlencode($formData['email']) . "&success=1";
+            }
+
             // Clear session data
             unset($_SESSION['uploaded_image']);
             
@@ -90,7 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save'])) {
             unset($_SESSION['csrf_token']);
             
             // Redirect to prevent form resubmission
-            header('Location: ' . $_SERVER['PHP_SELF'] . '?success=1&id=' . $customerId);
+            header('Location: ' . $_SERVER['PHP_SELF'] . $queryString);
             exit;
         } else {
             $errors = $validator->getErrors();
@@ -130,7 +139,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['email'])) {
         $formatted_string = str_replace(' ', '+', $_GET['email']);
 
         // Get customer details by email
-        $customer = $database->fetchCustomerById($formatted_string);
+        $customer = $database->getCustomerById($formatted_string);
 
         $details = $customer ?? [];
         $uploadedImage = $details['image_path'] ?? '';
@@ -154,400 +163,255 @@ $driverInfo = $database->getDriverInfo();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Customer Information Entry Form">
     <meta name="author" content="Your Name">
-    <title>Customer Information Entry - Secure Form</title>
+    <title>ABK - Proj Exercises</title>
     <style>
-        /* ==================== GLOBAL STYLES ==================== */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
-        
-        /* ==================== CONTAINER STYLES ==================== */
-        .container {
-            background: white;
-            padding: 40px;
-            border-radius: 10px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-            max-width: 600px;
-            width: 100%;
-        }
-        
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
-            text-align: center;
-        }
-        
-        .subtitle {
-            color: #666;
-            text-align: center;
-            margin-bottom: 30px;
-            font-size: 14px;
-        }
-        
-        /* ==================== DATABASE INFO STYLES ==================== */
-        .db-info {
-            background: #e8f4f8;
-            border: 1px solid #b3d9e6;
-            border-radius: 5px;
-            padding: 10px;
-            margin-bottom: 20px;
-            font-size: 12px;
-            color: #0066a1;
-        }
-        
-        .db-info strong {
-            color: #004d7a;
-        }
-        
-        .db-status-ok {
-            color: #28a745;
-            font-weight: bold;
-        }
-        
-        .db-status-error {
-            color: #dc3545;
-            font-weight: bold;
-        }
-        
-        /* ==================== ALERT STYLES ==================== */
-        .alert {
-            padding: 12px 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            font-size: 14px;
-        }
-        
-        .alert-error {
-            background-color: #fee;
-            color: #c33;
-            border: 1px solid #fcc;
-        }
-        
-        .alert-success {
-            background-color: #efe;
-            color: #3c3;
-            border: 1px solid #cfc;
-        }
-        
-        .alert ul {
-            margin-left: 20px;
-            margin-top: 5px;
-        }
-        
-        /* ==================== FORM STYLES ==================== */
-        .form-group {
-            margin-bottom: 20px;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 5px;
-            color: #333;
-            font-weight: 500;
-            font-size: 14px;
-        }
-        
-        .required {
-            color: #e74c3c;
-        }
-        
-        input[type="text"],
-        input[type="email"],
-        select {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 14px;
-            transition: border-color 0.3s;
-        }
-        
-        input[type="text"]:focus,
-        input[type="email"]:focus,
-        select:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-        
-        /* ==================== IMAGE UPLOAD STYLES ==================== */
-        .image-upload-section {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 5px;
-            border: 2px dashed #ddd;
-        }
-        
-        .image-preview {
-            margin-top: 15px;
-            text-align: center;
-        }
-        
-        .image-preview img {
-            max-width: 200px;
-            max-height: 200px;
-            border-radius: 5px;
-            border: 2px solid #ddd;
-            object-fit: cover;
-        }
-        
-        input[type="file"] {
-            margin-bottom: 10px;
-            font-size: 14px;
-        }
-        
-        /* ==================== BUTTON STYLES ==================== */
-        .button-group {
-            display: flex;
+        .main-container {
+            display: grid;
+            grid-template-columns: 50% 50%;
             gap: 10px;
-            margin-top: 30px;
-        }
-        
-        button {
-            flex: 1;
-            padding: 12px 24px;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        
-        button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-        
-        .btn-save {
-            background: #667eea;
-            color: white;
-        }
-        
-        .btn-save:hover:not(:disabled) {
-            background: #5568d3;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-        
-        .btn-cancel {
-            background: #e74c3c;
-            color: white;
-        }
-        
-        .btn-cancel:hover:not(:disabled) {
-            background: #c0392b;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(231, 76, 60, 0.4);
-        }
-        
-        .btn-upload {
-            background: #3498db;
-            color: white;
-            width: auto;
-            padding: 10px 20px;
-        }
-        
-        .btn-upload:hover:not(:disabled) {
-            background: #2980b9;
-        }
-        
-        /* ==================== RESPONSIVE DESIGN ==================== */
-        @media (max-width: 600px) {
-            .container {
-                padding: 20px;
-            }
-            
-            .button-group {
-                flex-direction: column;
-            }
         }
     </style>
+    <link rel="stylesheet" href="./styles/customer-form.css">
+    <link rel="stylesheet" href="./styles/mini-calc.css">
+    <link rel="stylesheet" href="./styles/screen-sharing.css">
+    <script src="./js/mini-calc.js"></script>
+    <script src="./js/screen-sharing.js"></script>
 </head>
 <body>
-    <div class="container">
-        <h1>Customer Information</h1>
-        <p class="subtitle">Secure data entry with validation</p>
-        
-        <!-- Display PDO + mysqlnd driver status -->
-        <!-- <div class="db-info">
-            <strong>Database Driver:</strong> PDO (<?php echo htmlspecialchars($driverInfo['driver']); ?>)<br>
-            <strong>Client Version:</strong> <?php echo htmlspecialchars($driverInfo['client_version']); ?><br>
-            <strong>mysqlnd Status:</strong> 
-            <?php if ($driverInfo['mysqlnd_active']): ?>
-                <span class="db-status-ok">✓ Active</span>
-            <?php else: ?>
-                <span class="db-status-error">✗ Inactive</span>
+    <div class="main-container">
+        <!-- Customer Form -->
+        <div class="customer-form-container">
+            <h1>Customer Information</h1>
+            <p class="subtitle">Secure data entry with validation</p>
+            
+            <!-- Display PDO + mysqlnd driver status -->
+            <!-- <div class="db-info">
+                <strong>Database Driver:</strong> PDO (<?php echo htmlspecialchars($driverInfo['driver']); ?>)<br>
+                <strong>Client Version:</strong> <?php echo htmlspecialchars($driverInfo['client_version']); ?><br>
+                <strong>mysqlnd Status:</strong> 
+                <?php if ($driverInfo['mysqlnd_active']): ?>
+                    <span class="db-status-ok">✓ Active</span>
+                <?php else: ?>
+                    <span class="db-status-error">✗ Inactive</span>
+                <?php endif; ?>
+            </div> -->
+            
+            <!-- Display error messages -->
+            <?php if (!empty($errors)): ?>
+                <div class="alert alert-error" role="alert">
+                    <strong>Please fix the following errors:</strong>
+                    <ul>
+                        <?php foreach ($errors as $error): ?>
+                            <li><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
             <?php endif; ?>
-        </div> -->
-        
-        <!-- Display error messages -->
-        <?php if (!empty($errors)): ?>
-            <div class="alert alert-error" role="alert">
-                <strong>Please fix the following errors:</strong>
-                <ul>
-                    <?php foreach ($errors as $error): ?>
-                        <li><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></li>
-                    <?php endforeach; ?>
+            
+            <!-- Display success message -->
+            <?php if (!empty($success)): ?>
+                <div class="alert alert-success" role="alert">
+                    <?php echo htmlspecialchars($success, ENT_QUOTES, 'UTF-8'); ?>
+                </div>
+            <?php endif; ?>
+            
+            <!-- Customer Information Form -->
+            <form method="POST" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES, 'UTF-8'); ?>" id="customerForm" novalidate>
+                <!-- CSRF Token -->
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
+                
+                <!-- Last Name Field -->
+                <div class="form-group">
+                    <label for="lastname">
+                        Last Name <span class="required">*</span>
+                    </label>
+                    <input 
+                        type="text" 
+                        id="lastname" 
+                        name="lastname" 
+                        placeholder="Enter last name"
+                        maxlength="255"
+                        required
+                        aria-required="true"
+                        value="<?php echo htmlspecialchars($details['lastname'] ?? '', ENT_QUOTES, 'UTF-8'); ?>"
+                    >
+                </div>
+                
+                <!-- First Name Field -->
+                <div class="form-group">
+                    <label for="firstname">
+                        First Name <span class="required">*</span>
+                    </label>
+                    <input 
+                        type="text" 
+                        id="firstname" 
+                        name="firstname" 
+                        placeholder="Enter first name"
+                        maxlength="255"
+                        required
+                        aria-required="true"
+                        value="<?php echo htmlspecialchars($details['firstname'] ?? '', ENT_QUOTES, 'UTF-8'); ?>"
+                    >
+                </div>
+                
+                <!-- Email Field -->
+                <div class="form-group">
+                    <label for="email">
+                        Email <span class="required">*</span>
+                    </label>
+                    <input 
+                        type="email" 
+                        id="email" 
+                        name="email" 
+                        placeholder="Enter email address"
+                        maxlength="255"
+                        required
+                        aria-required="true"
+                        value="<?php echo htmlspecialchars($details['email'] ?? '', ENT_QUOTES, 'UTF-8'); ?>"
+                    >
+                </div>
+                
+                <!-- City Field -->
+                <div class="form-group">
+                    <label for="city">
+                        City <span class="required">*</span>
+                    </label>
+                    <input 
+                        type="text" 
+                        id="city" 
+                        name="city" 
+                        placeholder="Enter city"
+                        maxlength="255"
+                        required
+                        aria-required="true"
+                        value="<?php echo htmlspecialchars($details['city'] ?? '', ENT_QUOTES, 'UTF-8'); ?>"
+                    >
+                </div>
+                
+                <!-- Country Dropdown -->
+                <div class="form-group">
+                    <label for="country">
+                        Country <span class="required">*</span>
+                    </label>
+                    <select
+                        id="country"
+                        name="country"
+                        required
+                        aria-required="true"
+                    >
+                        <?php
+                            $countries = ['', 'United States', 'Canada', 'Japan', 'United Kingdom', 'France', 'Germany'];
+                            $option = "";
+
+                            foreach ($countries as $country) {
+                                $selected = ($details['country'] ?? '') === $country ? 'selected' : '';
+                                $display = $country === '' ? '-- Select Country --' : $country;
+                                $option .= "<option value=\"" . htmlspecialchars($country, ENT_QUOTES, 'UTF-8') . "\" $selected>" . htmlspecialchars($display, ENT_QUOTES, 'UTF-8') . "</option>\n";
+                            }
+
+                            echo $option
+                        ?>
+                    </select>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="button-group">
+                    <button type="submit" name="save" class="btn-save">Save Customer</button>
+                    <button type="submit" name="cancel" class="btn-cancel">Cancel</button>
+                </div>
+            </form>
+            
+            <!-- Separate Form for Image Upload -->
+            <form method="POST" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES, 'UTF-8'); ?>" enctype="multipart/form-data" style="margin-top: 30px;">
+                <!-- CSRF Token -->
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
+                
+                <div class="form-group">
+                    <label for="customer_image">Customer Picture (JPEG only, max 5MB)</label>
+                    <div class="image-upload-section">
+                        <input 
+                            type="file" 
+                            id="customer_image" 
+                            name="customer_image" 
+                            accept=".jpg,.jpeg,image/jpeg"
+                            aria-describedby="upload-help"
+                        >
+                        <small id="upload-help" style="display: block; margin-bottom: 10px; color: #666;">
+                            Allowed formats: JPG, JPEG | Maximum size: 5MB
+                        </small>
+                        <button type="submit" name="upload_image" class="btn-upload">Upload Image</button>
+                        
+                        <!-- Display uploaded image preview -->
+                        <?php if (!empty($uploadedImage)): ?>
+                            <div class="image-preview">
+                                <p><strong>Current Image:</strong></p>
+                                <img src="<?php echo htmlspecialchars($uploadedImage, ENT_QUOTES, 'UTF-8'); ?>" alt="Customer Picture">
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </form>
+
+
+        </div>
+
+        <!-- Mini Pocket Calculator -->
+        <div class="calculator-container">
+            <h2>Mini Pocket Calculator</h2>
+            <input type="text" id="resultField" class="result-field" readonly placeholder="Result appears here">
+            <iframe id="displayFrame" sandbox="allow-scripts allow-same-origin" src="./calc-display-frame.html"></iframe>
+            <iframe id="buttonFrame" sandbox="allow-scripts allow-same-origin" src="./calc-button-frame.html"></iframe>
+            <div class="security-note">
+                <strong>Security:</strong> PostMessage API with origin validation, input sanitization, and sandboxed iframes.
+            </div>
+        </div>
+
+        <!-- Screen Sharing Section -->
+        <div class="screen-sharing-container">
+            <h1>🖥️ Screen Share - Co-worker Collaboration</h1>
+            <p class="subtitle">Share your screen with co-workers to review customer information together</p>
+            
+            <div class="status">
+                <div class="status-text" id="statusText">Ready to share</div>
+                <div class="status-detail" id="statusDetail">Click "Start Screen Share" to begin sharing your screen</div>
+            </div>
+            
+            <div class="controls">
+                <button id="startBtn" class="btn-primary" onclick="startSharing()">
+                    <span>📺</span> Start Screen Share
+                </button>
+                <button id="stopBtn" class="btn-danger" onclick="stopSharing()" disabled>
+                    <span>⏹️</span> Stop Sharing
+                </button>
+            </div>
+            
+            <div id="shareLinkContainer" class="share-link-container">
+                <label class="share-link-label">📤 Share this link with your co-worker:</label>
+                <div class="share-link-box">
+                    <input type="text" id="shareLink" class="share-link" readonly>
+                    <button class="btn-copy" onclick="copyLink()">📋 Copy Link</button>
+                </div>
+                <div class="connection-stats" id="connectionStats"></div>
+            </div>
+            
+            <div id="videoContainer" class="video-container">
+                <div class="video-overlay">
+                    <span class="recording-indicator"></span>
+                    <span id="viewerCount">0 viewers</span>
+                </div>
+                <video id="localVideo" autoplay muted playsinline></video>
+            </div>
+            
+            <div class="info-box">
+                <strong>ℹ️ How it works:</strong>
+                <ul style="margin-left: 20px; margin-top: 8px; line-height: 1.6;">
+                    <li>Click "Start Screen Share" and select which screen/window to share</li>
+                    <li>Copy and send the generated link to your co-worker</li>
+                    <li>Your co-worker opens the link to view your screen in real-time</li>
+                    <li>Perfect for reviewing customer data, troubleshooting, or collaboration</li>
                 </ul>
             </div>
-        <?php endif; ?>
-        
-        <!-- Display success message -->
-        <?php if (!empty($success)): ?>
-            <div class="alert alert-success" role="alert">
-                <?php echo htmlspecialchars($success, ENT_QUOTES, 'UTF-8'); ?>
-            </div>
-        <?php endif; ?>
-        
-        <!-- Customer Information Form -->
-        <form method="POST" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES, 'UTF-8'); ?>" id="customerForm" novalidate>
-            <!-- CSRF Token -->
-            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
-            
-            <!-- Last Name Field -->
-            <div class="form-group">
-                <label for="lastname">
-                    Last Name <span class="required">*</span>
-                </label>
-                <input 
-                    type="text" 
-                    id="lastname" 
-                    name="lastname" 
-                    placeholder="Enter last name"
-                    maxlength="255"
-                    required
-                    aria-required="true"
-                    value="<?php echo htmlspecialchars($details['lastname'] ?? '', ENT_QUOTES, 'UTF-8'); ?>"
-                >
-            </div>
-            
-            <!-- First Name Field -->
-            <div class="form-group">
-                <label for="firstname">
-                    First Name <span class="required">*</span>
-                </label>
-                <input 
-                    type="text" 
-                    id="firstname" 
-                    name="firstname" 
-                    placeholder="Enter first name"
-                    maxlength="255"
-                    required
-                    aria-required="true"
-                    value="<?php echo htmlspecialchars($details['firstname'] ?? '', ENT_QUOTES, 'UTF-8'); ?>"
-                >
-            </div>
-            
-            <!-- Email Field -->
-            <div class="form-group">
-                <label for="email">
-                    Email <span class="required">*</span>
-                </label>
-                <input 
-                    type="email" 
-                    id="email" 
-                    name="email" 
-                    placeholder="Enter email address"
-                    maxlength="255"
-                    required
-                    aria-required="true"
-                    value="<?php echo htmlspecialchars($details['email'] ?? '', ENT_QUOTES, 'UTF-8'); ?>"
-                >
-            </div>
-            
-            <!-- City Field -->
-            <div class="form-group">
-                <label for="city">
-                    City <span class="required">*</span>
-                </label>
-                <input 
-                    type="text" 
-                    id="city" 
-                    name="city" 
-                    placeholder="Enter city"
-                    maxlength="255"
-                    required
-                    aria-required="true"
-                    value="<?php echo htmlspecialchars($details['city'] ?? '', ENT_QUOTES, 'UTF-8'); ?>"
-                >
-            </div>
-            
-            <!-- Country Dropdown -->
-            <div class="form-group">
-                <label for="country">
-                    Country <span class="required">*</span>
-                </label>
-                <select
-                    id="country"
-                    name="country"
-                    required
-                    aria-required="true"
-                >
-                    <?php
-                        $countries = ['', 'United States', 'Canada', 'Japan', 'United Kingdom', 'France', 'Germany'];
-                        $option = "";
-
-                        foreach ($countries as $country) {
-                            $selected = ($details['country'] ?? '') === $country ? 'selected' : '';
-                            $display = $country === '' ? '-- Select Country --' : $country;
-                            $option .= "<option value=\"" . htmlspecialchars($country, ENT_QUOTES, 'UTF-8') . "\" $selected>" . htmlspecialchars($display, ENT_QUOTES, 'UTF-8') . "</option>\n";
-                        }
-
-                        echo $option
-                    ?>
-                </select>
-            </div>
-            
-            <!-- Action Buttons -->
-            <div class="button-group">
-                <button type="submit" name="save" class="btn-save">Save Customer</button>
-                <button type="submit" name="cancel" class="btn-cancel">Cancel</button>
-            </div>
-        </form>
-        
-        <!-- Separate Form for Image Upload -->
-        <form method="POST" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES, 'UTF-8'); ?>" enctype="multipart/form-data" style="margin-top: 30px;">
-            <!-- CSRF Token -->
-            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
-            
-            <div class="form-group">
-                <label for="customer_image">Customer Picture (JPEG only, max 5MB)</label>
-                <div class="image-upload-section">
-                    <input 
-                        type="file" 
-                        id="customer_image" 
-                        name="customer_image" 
-                        accept=".jpg,.jpeg,image/jpeg"
-                        aria-describedby="upload-help"
-                    >
-                    <small id="upload-help" style="display: block; margin-bottom: 10px; color: #666;">
-                        Allowed formats: JPG, JPEG | Maximum size: 5MB
-                    </small>
-                    <button type="submit" name="upload_image" class="btn-upload">Upload Image</button>
-                    
-                    <!-- Display uploaded image preview -->
-                    <?php if (!empty($uploadedImage)): ?>
-                        <div class="image-preview">
-                            <p><strong>Current Image:</strong></p>
-                            <img src="<?php echo htmlspecialchars($uploadedImage, ENT_QUOTES, 'UTF-8'); ?>" alt="Customer Picture">
-                        </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </form>
+        </div>
     </div>
     
     <!-- JavaScript for client-side validation -->
@@ -609,8 +473,6 @@ $driverInfo = $database->getDriverInfo();
             }
         });
 
-        // d@gmail.com
-        
         // Prevent double form submission
         const forms = document.querySelectorAll('form');
         forms.forEach(form => {

@@ -72,11 +72,232 @@ class CustomerFormTest extends TestCase
         $this->assertGreaterThan(0, $customerId);
         $this->assertIsInt($customerId);
     }
+
+    /**
+     * Test inserting customer without image path (nullable field)
+     */
+    public function testInsertCustomerWithoutImagePath(): void
+    {
+        $customerData = [
+            'lastname'  => 'Smith',
+            'firstname' => 'Jane',
+            'email'     => 'jane.smith@example.com',
+            'city'      => 'London',
+            'country'   => 'United Kingdom',
+        ];
+        
+        $customerId = $this->database->insertCustomer($customerData);
+        
+        $this->assertGreaterThan(0, $customerId);
+        
+        // Verify image_path is null
+        $customer = $this->database->getCustomerByEmail('jane.smith@example.com');
+        $this->assertNull($customer['image_path']);
+    }
     
     /**
-     * Test retrieving customer by ID
+     * Test inserting customer with special characters
      */
-    public function testGetCustomerById(): void
+    public function testInsertCustomerWithSpecialCharacters(): void
+    {
+        $customerData = [
+            'lastname'   => "O'Brien",
+            'firstname'  => 'Seán',
+            'email'      => 'sean.obrien@example.com',
+            'city'       => 'São Paulo',
+            'country'    => 'Brazil',
+            'image_path' => null,
+        ];
+        
+        $customerId = $this->database->insertCustomer($customerData);
+        
+        $this->assertGreaterThan(0, $customerId);
+        
+        // Verify data integrity
+        $customer = $this->database->getCustomerByEmail('sean.obrien@example.com');
+        $this->assertEquals("O'Brien", $customer['lastname']);
+        $this->assertEquals('Seán', $customer['firstname']);
+        $this->assertEquals('São Paulo', $customer['city']);
+    }
+    
+    /**
+     * Test inserting duplicate email throws exception
+     */
+    public function testInsertDuplicateEmailThrowsException(): void
+    {
+        $customerData = [
+            'lastname'  => 'Test',
+            'firstname' => 'User',
+            'email'     => 'duplicate@example.com',
+            'city'      => 'Test City',
+            'country'   => 'Test Country',
+        ];
+        
+        // Insert first customer
+        $this->database->insertCustomer($customerData);
+
+        // Attempt to insert duplicate - should throw exception
+        $this->expectException(PDOException::class);
+        $this->database->insertCustomer($customerData);
+    }
+    
+    /**
+     * Test inserting customer returns correct auto-increment ID
+     */
+    public function testInsertCustomerReturnsCorrectAutoIncrementId(): void
+    {
+        $customer1 = [
+            'lastname'  => 'First',
+            'firstname' => 'Customer',
+            'email'     => 'first@example.com',
+            'city'      => 'City1',
+            'country'   => 'Country1',
+        ];
+        
+        $customer2 = [
+            'lastname'  => 'Second',
+            'firstname' => 'Customer',
+            'email'     => 'second@example.com',
+            'city'      => 'City2',
+            'country'   => 'Country2',
+        ];
+        
+        $id1 = $this->database->insertCustomer($customer1);
+        $id2 = $this->database->insertCustomer($customer2);
+        
+        $this->assertEquals($id1 + 1, $id2);
+    }
+
+    /**
+     * Test successful customer update
+     */
+    public function testUpdateCustomerSuccess(): void
+    {
+        // First, insert a customer
+        $originalData = [
+            'lastname'   => 'Original',
+            'firstname'  => 'Name',
+            'email'      => 'update.test@example.com',
+            'city'       => 'Old City',
+            'country'    => 'Old Country',
+            'image_path' => 'uploads/old.jpg',
+        ];
+        
+        $this->database->insertCustomer($originalData);
+        
+        // Now update the customer
+        $updatedData = [
+            'lastname'   => 'Updated',
+            'firstname'  => 'NewName',
+            'email'      => 'update.test@example.com', // Same email
+            'city'       => 'New City',
+            'country'    => 'New Country',
+            'image_path' => 'uploads/new.jpg',
+        ];
+        
+        $result = $this->database->updateCustomer($updatedData);
+        
+        $this->assertTrue($result);
+        
+        // Verify the update
+        $customer = $this->database->getCustomerByEmail('update.test@example.com');
+        $this->assertEquals('Updated', $customer['lastname']);
+        $this->assertEquals('NewName', $customer['firstname']);
+        $this->assertEquals('New City', $customer['city']);
+        $this->assertEquals('New Country', $customer['country']);
+        $this->assertEquals('uploads/new.jpg', $customer['image_path']);
+    }
+    
+    /**
+     * Test updating non-existent customer returns false
+     */
+    public function testUpdateNonExistentCustomerReturnsFalse(): void
+    {
+        $updateData = [
+            'lastname'  => 'Test',
+            'firstname' => 'User',
+            'email'     => 'nonexistent@example.com',
+            'city'      => 'Test City',
+            'country'   => 'Test Country',
+        ];
+        
+        $result = $this->database->updateCustomer($updateData);
+        
+        // Update succeeds but affects 0 rows, still returns true
+        $this->assertTrue($result);
+    }
+    
+    /**
+     * Test updating customer with null image path
+     */
+    public function testUpdateCustomerWithNullImagePath(): void
+    {
+        // Insert customer with image
+        $originalData = [
+            'lastname'   => 'Test',
+            'firstname'  => 'User',
+            'email'      => 'test.null@example.com',
+            'city'       => 'City',
+            'country'    => 'Country',
+            'image_path' => 'uploads/image.jpg',
+        ];
+        
+        $this->database->insertCustomer($originalData);
+        
+        // Update to remove image
+        $updatedData = [
+            'lastname'   => 'Test',
+            'firstname'  => 'User',
+            'email'      => 'test.null@example.com',
+            'city'       => 'City',
+            'country'    => 'Country',
+            'image_path' => null,
+        ];
+        
+        $result = $this->database->updateCustomer($updatedData);
+        $this->assertTrue($result);
+        
+        // Verify image_path is now null
+        $customer = $this->database->getCustomerByEmail('test.null@example.com');
+        $this->assertNull($customer['image_path']);
+    }
+    
+    /**
+     * Test partial update preserves email
+     */
+    public function testUpdatePreservesEmail(): void
+    {
+        // Insert customer
+        $originalData = [
+            'lastname'  => 'Original',
+            'firstname' => 'User',
+            'email'     => 'preserve@example.com',
+            'city'      => 'OldCity',
+            'country'   => 'OldCountry',
+        ];
+        
+        $this->database->insertCustomer($originalData);
+        
+        // Update (email should remain the same)
+        $updatedData = [
+            'lastname'  => 'Updated',
+            'firstname' => 'NewUser',
+            'email'     => 'preserve@example.com',
+            'city'      => 'NewCity',
+            'country'   => 'NewCountry',
+        ];
+        
+        $this->database->updateCustomer($updatedData);
+        
+        // Verify email hasn't changed
+        $customer = $this->database->getCustomerByEmail('preserve@example.com');
+        $this->assertEquals('preserve@example.com', $customer['email']);
+    }
+
+    /**
+     * Test retrieving customer by email
+     */
+    public function testGetCustomerByEmail(): void
     {
         // Insert test customer
         $customerData = [
@@ -88,10 +309,10 @@ class CustomerFormTest extends TestCase
             'image_path' => null,
         ];
         
-        $customerId = $this->database->insertCustomer($customerData);
+        $this->database->insertCustomer($customerData);
         
         // Retrieve customer
-        $customer = $this->database->getCustomerById($customerId);
+        $customer = $this->database->getCustomerByEmail($customerData["email"]);
         
         $this->assertNotNull($customer);
         $this->assertEquals('Smith', $customer['lastname']);
@@ -104,8 +325,34 @@ class CustomerFormTest extends TestCase
      */
     public function testGetNonExistentCustomer(): void
     {
-        $customer = $this->database->getCustomerById(99999);
+        $customer = $this->database->getCustomerByEmail("test@gmail.com");
         $this->assertNull($customer);
+    }
+
+    /**
+     * Test fetching customer returns all expected fields
+     */
+    public function testFetchCustomerReturnsAllFields(): void
+    {
+        $customerData = [
+            'lastname'  => 'Complete',
+            'firstname' => 'Data',
+            'email'     => 'complete@example.com',
+            'city'      => 'Full City',
+            'country'   => 'Full Country',
+        ];
+        
+        $this->database->insertCustomer($customerData);
+        $customer = $this->database->getCustomerByEmail('complete@example.com');
+        
+        // Check all expected fields exist
+        $this->assertArrayHasKey('id', $customer);
+        $this->assertArrayHasKey('lastname', $customer);
+        $this->assertArrayHasKey('firstname', $customer);
+        $this->assertArrayHasKey('email', $customer);
+        $this->assertArrayHasKey('city', $customer);
+        $this->assertArrayHasKey('country', $customer);
+        $this->assertArrayHasKey('image_path', $customer);
     }
     
     // ==================== VALIDATION TESTS ====================
@@ -375,7 +622,7 @@ class CustomerFormTest extends TestCase
         $this->assertGreaterThan(0, $customerId, 'Customer ID should be positive');
         
         // Step 3: Retrieve and verify
-        $savedCustomer = $this->database->getCustomerById($customerId);
+        $savedCustomer = $this->database->getCustomerByEmail($customerData['email']);
         $this->assertNotNull($savedCustomer, 'Customer should be retrievable');
         $this->assertEquals($customerData['email'], $savedCustomer['email']);
         $this->assertEquals($customerData['country'], $savedCustomer['country']);
@@ -459,7 +706,7 @@ class CustomerFormTest extends TestCase
         $this->assertGreaterThan(0, $customerId);
         
         // Retrieve and verify data is stored as-is (not executed)
-        $customer = $this->database->getCustomerById($customerId);
+        $customer = $this->database->getCustomerByEmail($maliciousData['email']);
         $this->assertEquals("'; DROP TABLE customers; --", $customer['lastname']);
         
         // Verify table still exists (wasn't dropped)

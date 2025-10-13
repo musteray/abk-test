@@ -75,13 +75,44 @@ class Database
     }
 
     /**
+     * Update customer data based on email
+     * 
+     * @param array $data Customer data
+     * @return bool True on success, false on failure
+     * @throws PDOException on database error
+     */
+    public function updateCustomer(array $data): bool
+    {
+        $pdo = $this->getConnection();
+        
+        $sql = 'UPDATE customers SET 
+                    lastname = :lastname, 
+                    firstname = :firstname, 
+                    city = :city, 
+                    country = :country, 
+                    image_path = :image_path 
+                WHERE email = :email';
+        
+        $stmt = $pdo->prepare($sql);
+        
+        return $stmt->execute([
+            ':lastname'   => $data['lastname'],
+            ':firstname'  => $data['firstname'],
+            ':city'       => $data['city'],
+            ':country'    => $data['country'],
+            ':image_path' => $data['image_path'] ?? null,
+            ':email'      => $data['email'],
+        ]);
+    }
+
+    /**
      * Fetch customer details by email
      * 
      * @param string $email Customer email
      * @return array|null Customer data or null if not found
      * @throws PDOException on database error
      */
-    public function fetchCustomerById(string $email): ?array
+    public function getCustomerById(string $email): ?array
     {
         $pdo = $this->getConnection();
         
