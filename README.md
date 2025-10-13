@@ -37,6 +37,8 @@ This repo have 4 exercises.
    3. ./vendor/bin/phpunit tests/CustomerFormTest.php --testdox
    ```
 
+* Access http://localhost/index.php
+
 ### Referrences
 
 1. [Lamp Docker](https://github.com/sprintcube/docker-compose-lamp)
