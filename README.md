@@ -4,17 +4,24 @@ This repo have 4 exercises.
 
 ### System requirements
 
-1. Docker latest
+1. Docker 28.4.0
 
-### Get started
+### Setup
 
-1. Build docker
+1. Clone repo
+
+   ```bash
+   git clone git@github.com:musteray/abk-test.git
+   ```
+
+
+2. Build docker
 
    ```bash
    docker compose up -d
    ```
 
-2. Download phpUnit inside docker
+3. Download phpunit inside docker
 
    ```bash
    1. docker exec -it <lamp-server> sh
@@ -22,7 +29,7 @@ This repo have 4 exercises.
    3. composer install
    ```
 
-3. Run PhpUnit tests
+4. Run PhpUnit tests
 
    ```bash
    1. docker exec -it <lamp-server> sh
