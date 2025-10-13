@@ -1,1 +1,8 @@
-mysql_data/*
+/.env
+/.vscode
+/data/*
+/logs/*
+.DS_Store
+/buildtest
+/www/abk/vendor
+/www/abk/composer.lock
