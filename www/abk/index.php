@@ -82,14 +82,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save'])) {
         if ($validator->validateCustomerData($formData)) {
             $queryString = "";
 
-            if (isset($_GET['email'])) {
-                // Insert into database
+            if (isset($_SESSION['is_edit_mode']) && $_SESSION['is_edit_mode'] === true) {
+                $database->updateCustomer($formData);
+                $queryString = '?email=' . urlencode($formData['email']) . "&success=1";
+            } else {
+               // Insert into database
                 $customerId = $database->insertCustomer($formData);
 
                 $queryString = '?success=1&id=' . $customerId;
-            } else {
-               $database->updateCustomer($formData);
-               $queryString = '?email=' . urlencode($formData['email']) . "&success=1";
             }
 
             // Clear session data
@@ -97,7 +97,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save'])) {
             
             // Regenerate CSRF token
             unset($_SESSION['csrf_token']);
-            
+
+            // Clear edit mode flag
+            unset($_SESSION['is_edit_mode']);
+
             // Redirect to prevent form resubmission
             header('Location: ' . $_SERVER['PHP_SELF'] . $queryString);
             exit;
@@ -134,7 +137,7 @@ if (isset($_GET['success']) && $_GET['success'] === '1') {
 }
 
 // ==================== HANDLE FETCH DETAILS BY EMAIL ====================
-if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['email'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['email']) && !isset($_GET['success'])) {
     try {
         $formatted_string = str_replace(' ', '+', $_GET['email']);
 
@@ -143,9 +146,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['email'])) {
 
         $details = $customer ?? [];
         $uploadedImage = $details['image_path'] ?? '';
+        $_SESSION['is_edit_mode'] = true;
+
+        if (empty($details)) {
+            throw new RuntimeException('Customer not found with the provided email.');
+        }
     } catch (PDOException $e) {
         error_log('Customer not found: ' . $e->getMessage());
         $errors[] = 'Customer not found.';
+    } catch (RuntimeException $e) {
+        $errors[] = $e->getMessage();
     } catch (Exception $e) {
         error_log('Unexpected error: ' . $e->getMessage());
         $errors[] = 'An unexpected error occurred. Please try again.';
@@ -267,6 +277,12 @@ $driverInfo = $database->getDriverInfo();
                         maxlength="255"
                         required
                         aria-required="true"
+                        <?php
+                            // Disable email field in edit mode
+                            if (isset($_SESSION['is_edit_mode']) && $_SESSION['is_edit_mode'] === true) {
+                                echo 'readonly style="background-color: #f0f0f0; cursor: not-allowed;"';
+                            }
+                        ?>
                         value="<?php echo htmlspecialchars($details['email'] ?? '', ENT_QUOTES, 'UTF-8'); ?>"
                     >
                 </div>
